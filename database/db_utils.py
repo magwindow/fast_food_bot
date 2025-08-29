@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import update, select, DECIMAL
 
 from database.engine import engine
-from database.models import Users, Carts, Categories, Products
+from database.models import Users, Carts, Categories, Products, FinallyCarts
 
 with Session(engine) as session:
     db_session = session
@@ -83,3 +83,20 @@ def db_get_product_by_name(product_name: str) -> Products:
     """Получаем продукт по имени"""
     query = select(Products).where(Products.product_name == product_name)
     return db_session.scalar(query)
+
+
+def db_insert_or_update_finally_cart(cart_id, product_name, total_products, total_price):
+    """Постоянная корзина. Вносим новую запись либо редактируем существующую, если такой продукт уже есть."""
+    try:
+        query = FinallyCarts(cart_id=cart_id, product_name=product_name,
+                             quantity=total_products, final_price=total_price)
+        db_session.add(query)
+        db_session.commit()
+        return True
+    except IntegrityError:
+        db_session.rollback()
+        query = update(FinallyCarts).where(FinallyCarts.product_name == product_name)\
+            .where(FinallyCarts.cart_id == cart_id).values(quantity=total_products, final_price=total_price)
+        db_session.execute(query)
+        db_session.commit()
+        return False

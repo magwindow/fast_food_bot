@@ -12,7 +12,7 @@ from aiogram.exceptions import TelegramBadRequest
 load_dotenv(find_dotenv())
 
 from database.db_utils import db_register_user, db_update_user, db_create_user_cart, db_get_product_by_id, \
-    db_get_user_cart, db_update_to_cart, db_get_product_by_name
+    db_get_user_cart, db_update_to_cart, db_get_product_by_name, db_insert_or_update_finally_cart
 from keyboards.reply_kb import share_phone_button, generate_main_menu, back_to_main_menu, back_arrow_button
 from keyboards.inline_kb import generate_category_menu, show_product_by_category, generate_constructor_buttons
 from utils.caption import text_for_caption
@@ -134,6 +134,24 @@ async def constructor_change(call: CallbackQuery):
                                      reply_markup=generate_constructor_buttons(user_cart.total_products))
     except TelegramBadRequest as e:
         print(e)
+
+
+@dp.callback_query(F.data == 'put into cart')
+async def put_into_cart(call: CallbackQuery):
+    """Добавление товара в корзину"""
+    chat_id = call.from_user.id
+    message_id = call.message.message_id
+    product_name = call.message.caption.split('\n')[0]
+    cart = db_get_user_cart(chat_id)
+    await bot.delete_message(chat_id=chat_id, message_id=message_id)
+
+    if db_insert_or_update_finally_cart(cart_id=cart.id, product_name=product_name, total_products=cart.total_products,
+                                        total_price=cart.total_price):
+        await bot.send_message(chat_id=chat_id, text='Продукт успешно добавлен ✅')
+    else:
+        await bot.send_message(chat_id=chat_id, text='Количество успешно изменено ✏️')
+
+    await return_to_category_menu(call.message)
 
 
 async def start_register_user(message: Message):
