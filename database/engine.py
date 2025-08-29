@@ -12,7 +12,7 @@ DB_PASSWORD = os.getenv('DB_PASSWORD')
 DB_ADDRESS = os.getenv('DB_ADDRESS')
 DB_NAME = os.getenv('DB_NAME')
 
-engine = create_engine(f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_ADDRESS}/{DB_NAME}', echo=True)
+engine = create_engine(f'postgresql://{DB_USER}:{DB_PASSWORD}@{DB_ADDRESS}/{DB_NAME}', echo=False)
 
 
 def main():

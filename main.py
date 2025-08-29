@@ -3,17 +3,18 @@ import asyncio
 from dotenv import load_dotenv, find_dotenv
 
 from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, CallbackQuery, FSInputFile
+from aiogram.types import Message, CallbackQuery, FSInputFile, InputMediaPhoto
 from aiogram.filters import CommandStart
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
+from aiogram.exceptions import TelegramBadRequest
 
 load_dotenv(find_dotenv())
 
 from database.db_utils import db_register_user, db_update_user, db_create_user_cart, db_get_product_by_id, \
-    db_get_user_cart, db_update_to_cart
-from keyboards.reply_kb import share_phone_button, generate_main_menu, back_to_main_menu
-from keyboards.inline_kb import generate_category_menu, show_product_by_category
+    db_get_user_cart, db_update_to_cart, db_get_product_by_name
+from keyboards.reply_kb import share_phone_button, generate_main_menu, back_to_main_menu, back_arrow_button
+from keyboards.inline_kb import generate_category_menu, show_product_by_category, generate_constructor_buttons
 from utils.caption import text_for_caption
 
 bot = Bot(token=os.getenv('TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -53,6 +54,13 @@ async def return_to_main_menu(message: Message):
     await show_main_menu(message)
 
 
+@dp.message(F.text == '⬅️ Назад')
+async def return_to_category_menu(message: Message):
+    """Назад к выбору продукта по категории"""
+    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
+    await make_order(message)
+
+
 @dp.callback_query(F.data.regexp(r'category_[1-9]'))
 async def show_product_button(call: CallbackQuery):
     """Показ всех продуктов выбранной категории"""
@@ -86,10 +94,46 @@ async def show_product_detail(call: CallbackQuery):
 
         text = text_for_caption(product.product_name, product.description, product.price)
 
-        await bot.send_photo(chat_id=chat_id, photo=FSInputFile(path=product.image), caption=text)
+        await bot.send_message(chat_id=chat_id, text='Выберете модификатор', reply_markup=back_arrow_button())
+        await bot.send_photo(chat_id=chat_id, photo=FSInputFile(path=product.image), caption=text,
+                             reply_markup=generate_constructor_buttons())
     else:
         await bot.send_message(chat_id=chat_id, text='К сожалению у нас нет, вашего контакта',
                                reply_markup=share_phone_button())
+
+
+@dp.callback_query(F.data.regexp(r'action [+-]'))
+async def constructor_change(call: CallbackQuery):
+    """Логика конструктора"""
+    chat_id = call.from_user.id
+    message_id = call.message.message_id
+    action = call.data.split()[-1]
+    product_name = call.message.caption.split('\n')[0]
+    user_cart = db_get_user_cart(chat_id)
+    product = db_get_product_by_name(product_name)
+    product_price = product.price
+
+    match action:
+        case '+':
+            user_cart.total_products += 1
+            product_price = product_price * user_cart.total_products
+            db_update_to_cart(price=product_price, quantity=user_cart.total_products, cart_id=user_cart.id)
+        case '-':
+            if user_cart.total_products < 2:
+                await call.answer('Меньше одного нельзя')
+            else:
+                user_cart.total_products -= 1
+            product_price = product_price * user_cart.total_products
+            db_update_to_cart(price=product_price, quantity=user_cart.total_products, cart_id=user_cart.id)
+
+    text = text_for_caption(name=product_name, description=product.description, price=product_price)
+
+    try:
+        await bot.edit_message_media(chat_id=chat_id, message_id=message_id,
+                                     media=InputMediaPhoto(media=FSInputFile(path=product.image), caption=text),
+                                     reply_markup=generate_constructor_buttons(user_cart.total_products))
+    except TelegramBadRequest as e:
+        print(e)
 
 
 async def start_register_user(message: Message):

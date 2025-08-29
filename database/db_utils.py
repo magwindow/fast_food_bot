@@ -77,3 +77,9 @@ def db_update_to_cart(price: DECIMAL, cart_id: int, quantity=1) -> None:
     query = update(Carts).where(Carts.id == cart_id).values(total_price=price, total_products=quantity)
     db_session.execute(query)
     db_session.commit()
+
+
+def db_get_product_by_name(product_name: str) -> Products:
+    """Получаем продукт по имени"""
+    query = select(Products).where(Products.product_name == product_name)
+    return db_session.scalar(query)
