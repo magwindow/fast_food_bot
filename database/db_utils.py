@@ -3,6 +3,7 @@ from typing import Iterable
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from sqlalchemy import update, select, DECIMAL
+from sqlalchemy.sql.functions import sum
 
 from database.engine import engine
 from database.models import Users, Carts, Categories, Products, FinallyCarts
@@ -95,8 +96,21 @@ def db_insert_or_update_finally_cart(cart_id, product_name, total_products, tota
         return True
     except IntegrityError:
         db_session.rollback()
-        query = update(FinallyCarts).where(FinallyCarts.product_name == product_name)\
+        query = update(FinallyCarts).where(FinallyCarts.product_name == product_name) \
             .where(FinallyCarts.cart_id == cart_id).values(quantity=total_products, final_price=total_price)
         db_session.execute(query)
         db_session.commit()
         return False
+
+
+def db_get_finally_price(chat_id: int) -> DECIMAL:
+    """Получение общей суммы пользователя с постоянной корзины"""
+    query = select(sum(FinallyCarts.final_price)).join(Carts).join(Users).where(Users.telegram == chat_id)
+    return db_session.execute(query).fetchone()[0]
+
+
+def db_get_finally_cart_products(chat_id: int) -> Iterable:
+    """Получаем список товаров с корзины по telegram id пользователя"""
+    query = select(FinallyCarts.product_name, FinallyCarts.quantity, FinallyCarts.final_price, FinallyCarts.cart_id) \
+        .join(Carts).join(Users).where(Users.telegram == chat_id)
+    return db_session.execute(query).fetchall()

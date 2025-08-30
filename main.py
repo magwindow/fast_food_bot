@@ -15,7 +15,7 @@ from database.db_utils import db_register_user, db_update_user, db_create_user_c
     db_get_user_cart, db_update_to_cart, db_get_product_by_name, db_insert_or_update_finally_cart
 from keyboards.reply_kb import share_phone_button, generate_main_menu, back_to_main_menu, back_arrow_button
 from keyboards.inline_kb import generate_category_menu, show_product_by_category, generate_constructor_buttons
-from utils.caption import text_for_caption
+from utils.caption import text_for_caption, counting_products_from_cart
 
 bot = Bot(token=os.getenv('TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
@@ -42,9 +42,8 @@ async def update_user_info_finish_register(message: Message):
 async def make_order(message: Message):
     """Реакция на кнопку 'Сделать заказ'"""
     chat_id = message.chat.id
-    # TODO Получить id корзины пользователя
     await bot.send_message(chat_id=chat_id, text='Погнали!', reply_markup=back_to_main_menu())
-    await message.answer('Выберите категорию', reply_markup=generate_category_menu())
+    await message.answer('Выберите категорию', reply_markup=generate_category_menu(chat_id))
 
 
 @dp.message(F.text == 'Главное меню')
@@ -77,7 +76,7 @@ async def return_to_category_button(call: CallbackQuery):
     chat_id = call.message.chat.id
     message_id = call.message.message_id
     await bot.edit_message_text(text='Выберите категорию', chat_id=chat_id, message_id=message_id,
-                                reply_markup=generate_category_menu())
+                                reply_markup=generate_category_menu(chat_id))
 
 
 @dp.callback_query(F.data.contains('product_'))
@@ -152,6 +151,17 @@ async def put_into_cart(call: CallbackQuery):
         await bot.send_message(chat_id=chat_id, text='Количество успешно изменено ✏️')
 
     await return_to_category_menu(call.message)
+
+
+@dp.callback_query(F.data == 'Ваша корзина')
+async def show_finally_cart(call: CallbackQuery):
+    """Показ содержимого корзины"""
+    chat_id = call.from_user.id
+    message_id = call.message.message_id
+    context = counting_products_from_cart(chat_id, 'Ваша корзина')
+    if context:
+        count, text, *_ = context
+        await bot.send_message(chat_id=chat_id, text=text)
 
 
 async def start_register_user(message: Message):
