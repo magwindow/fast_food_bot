@@ -12,9 +12,10 @@ from aiogram.exceptions import TelegramBadRequest
 load_dotenv(find_dotenv())
 
 from database.db_utils import db_register_user, db_update_user, db_create_user_cart, db_get_product_by_id, \
-    db_get_user_cart, db_update_to_cart, db_get_product_by_name, db_insert_or_update_finally_cart
+    db_get_user_cart, db_update_to_cart, db_get_product_by_name, db_insert_or_update_finally_cart, db_delete_product
 from keyboards.reply_kb import share_phone_button, generate_main_menu, back_to_main_menu, back_arrow_button
-from keyboards.inline_kb import generate_category_menu, show_product_by_category, generate_constructor_buttons
+from keyboards.inline_kb import generate_category_menu, show_product_by_category, generate_constructor_buttons, \
+    generate_delete_product
 from utils.caption import text_for_caption, counting_products_from_cart
 
 bot = Bot(token=os.getenv('TOKEN'), default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -161,7 +162,19 @@ async def show_finally_cart(call: CallbackQuery):
     context = counting_products_from_cart(chat_id, 'Ваша корзина')
     if context:
         count, text, *_ = context
-        await bot.send_message(chat_id=chat_id, text=text)
+        await bot.send_message(chat_id=chat_id, text=text, reply_markup=generate_delete_product(chat_id))
+    else:
+        await bot.send_message(chat_id=chat_id, text='Ваша корзина пуста 😔')
+        await make_order(call.message)
+
+
+@dp.callback_query(F.data.regexp(r'delete_\d+'))
+async def delete_cart_product(call: CallbackQuery):
+    """Реакция на кнопку с крестиком"""
+    finally_id = int(call.data.split('_')[-1])
+    db_delete_product(finally_id)
+    await bot.answer_callback_query(callback_query_id=call.id, text='Продукт удален!')
+    await show_finally_cart(call)
 
 
 async def start_register_user(message: Message):

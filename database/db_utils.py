@@ -2,7 +2,7 @@ from typing import Iterable
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
-from sqlalchemy import update, select, DECIMAL
+from sqlalchemy import update, select, DECIMAL, delete
 from sqlalchemy.sql.functions import sum
 
 from database.engine import engine
@@ -114,3 +114,15 @@ def db_get_finally_cart_products(chat_id: int) -> Iterable:
     query = select(FinallyCarts.product_name, FinallyCarts.quantity, FinallyCarts.final_price, FinallyCarts.cart_id) \
         .join(Carts).join(Users).where(Users.telegram == chat_id)
     return db_session.execute(query).fetchall()
+
+
+def db_get_product_for_delete(chat_id: int) -> Iterable:
+    query = select(FinallyCarts.id, FinallyCarts.product_name).join(Carts).join(Users).where(Users.telegram == chat_id)
+    return db_session.execute(query).fetchall()
+
+
+def db_delete_product(finally_id: int):
+    """Удаление товара"""
+    query = delete(FinallyCarts).where(FinallyCarts.id == finally_id)
+    db_session.execute(query)
+    db_session.commit()
