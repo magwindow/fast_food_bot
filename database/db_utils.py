@@ -126,3 +126,6 @@ def db_delete_product(finally_id: int):
     query = delete(FinallyCarts).where(FinallyCarts.id == finally_id)
     db_session.execute(query)
     db_session.commit()
+
+
+

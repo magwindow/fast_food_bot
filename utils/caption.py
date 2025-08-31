@@ -11,7 +11,7 @@ def text_for_caption(name, description, price):
 def counting_products_from_cart(chat_id, user_text):
     products = db_get_finally_cart_products(chat_id)
     if products:
-        text = f'<b>{user_text}</b>\n\n'
+        text = f'{user_text}\n\n'
         total_products = total_price = count = 0
         for name, quantity, price, cart_id in products:
             count += 1
